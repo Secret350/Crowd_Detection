@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crowd Detection</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --text:#1c1e21; --muted:#6b7280; --accent:#2563eb; --line:#e5e7eb; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#111418; --card:#1a1e24; --text:#e8eaed; --muted:#9aa3af; --accent:#60a5fa; --line:#2b313a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui,sans-serif; }
+  main { max-width:1100px; margin:0 auto; padding:24px 16px 64px; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
+  button { background:var(--accent); color:#fff; border:0; border-radius:8px; padding:9px 16px; font-size:14px; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .bar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; margin:10px 0 6px; }
+  .bar > div { height:100%; width:0; background:var(--accent); transition:width .3s; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .grid .card { margin-bottom:0; }
+  @media (max-width:760px) { .grid { grid-template-columns:1fr; } }
+  video, img { width:100%; display:block; border-radius:8px; background:#000; }
+  .white video, .white img { background:#fff; }
+  h3 { margin:0 0 8px; font-size:14px; color:var(--muted); font-weight:600; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .tabs { margin-left:auto; display:flex; gap:4px; }
+  .tab { background:transparent; color:var(--muted); border:1px solid var(--line); padding:2px 10px; font-size:12px; border-radius:6px; }
+  .tab.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  pre { margin:0; max-height:320px; overflow:auto; background:var(--bg); padding:12px; border-radius:8px; font-size:12px; white-space:pre-wrap; }
+  .err { color:#dc2626; white-space:pre-wrap; }
+  .hint { color:var(--muted); font-size:13px; margin-top:8px; }
+  .big { font-size:56px; font-weight:700; line-height:1; margin:4px 0 10px; }
+  .big small { font-size:16px; font-weight:400; color:var(--muted); }
+  .kv { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:10px; }
+  .kv b { display:block; font-size:18px; }
+  .kv span { color:var(--muted); font-size:12px; }
+  canvas { width:100%; height:110px; display:block; }
+  .row { display:flex; gap:8px; align-items:center; margin-top:12px; flex-wrap:wrap; }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Phát hiện đám đông bất thường</h1>
+  <p class="sub">Tải video hoặc ảnh lên: ByteTrack → đếm người → heatmap mật độ → dòng người → log tụ tập.</p>
+
+  <div class="card">
+    <input type="file" id="file" accept=".mp4,.avi,.mov,.mkv,.jpg,.jpeg,.png,.bmp,.webp,video/*,image/*">
+    <button id="run">Phân tích</button>
+    <div class="hint">Video tối đa 500 MB, ảnh tối đa 30 MB. Với ảnh chỉ có kết quả của 1 khung hình (không có chuyển động nên không có dòng người).</div>
+    <div id="status" class="hidden">
+      <div class="bar"><div id="fill"></div></div>
+      <span id="msg"></span>
+    </div>
+  </div>
+
+  <div id="result" class="hidden">
+    <div class="grid">
+      <div class="card"><h3>Tracking (bbox)</h3><div id="m1"></div></div>
+
+      <div class="card">
+        <h3>Heatmap mật độ
+          <span class="tabs" id="heatTabs">
+            <button class="tab on" data-k="white">Nền trắng</button>
+            <button class="tab" data-k="video">Trên video</button>
+          </span>
+        </h3>
+        <div id="m2"></div>
+      </div>
+
+      <div class="card">
+        <h3>Dòng người (flow)</h3>
+        <div id="m3" class="white"></div>
+        <div class="hint">Mũi tên = hướng và tốc độ trung bình theo vùng; vệt = quỹ đạo 3 giây gần nhất; màu theo hướng (xem bánh xe màu góc phải). Chấm xám = đứng yên.</div>
+      </div>
+
+      <div class="card">
+        <h3>Số người trong khung hình</h3>
+        <div class="big"><span id="cnt">–</span> <small>người</small></div>
+        <div class="kv">
+          <div><b id="mov">–</b><span>đang di chuyển</span></div>
+          <div><b id="spd">–</b><span>tốc độ TB (px/s)</span></div>
+          <div><b id="dir">–</b><span>hướng chủ đạo</span></div>
+        </div>
+        <canvas id="chart"></canvas>
+        <div class="hint" id="cstat"></div>
+      </div>
+    </div>
+
+    <div class="row">
+      <button id="sync">Phát đồng bộ các video</button>
+      <span class="hint" style="margin:0">Số người, tốc độ và hướng cập nhật theo vị trí phát của video đang xem.</span>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Log tụ tập <a id="dl" download style="font-weight:400">(tải về)</a></h3>
+      <pre id="log"></pre>
+    </div>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const setMsg = (t, err=false) => { $("msg").textContent = t; $("msg").className = err ? "err" : ""; };
+const DIR_VI = { "right":"sang phải", "down-right":"xuống dưới-phải", "down":"xuống dưới", "down-left":"xuống dưới-trái",
+                 "left":"sang trái", "up-left":"lên trên-trái", "up":"lên trên", "up-right":"lên trên-phải" };
+let series = null, files = {}, lastVideo = null, lastIdx = -1, syncing = false, hm = {};
+const vids = () => [...document.querySelectorAll("#m1 video, #m2 video, #m3 video")];
+const mmss = t => `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+
+/* ------------------------------------------------------------------ upload + poll */
+$("run").onclick = () => {
+  const f = $("file").files[0];
+  if (!f) return alert("Chọn video hoặc ảnh trước");
+  $("run").disabled = true;
+  $("status").classList.remove("hidden");
+  $("result").classList.add("hidden");
+  $("fill").style.width = "0%";
+  setMsg("Đang upload...");
+
+  const fd = new FormData(); fd.append("file", f);
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/jobs");
+  xhr.upload.onprogress = e => {
+    if (e.lengthComputable) {
+      $("fill").style.width = (e.loaded / e.total * 100) + "%";
+      setMsg(`Đang upload ${(e.loaded/1048576).toFixed(1)} / ${(e.total/1048576).toFixed(1)} MB`);
+    }
+  };
+  xhr.onload = () => {
+    if (xhr.status !== 200) {
+      let d = ""; try { d = JSON.parse(xhr.responseText).detail } catch {}
+      setMsg("Upload lỗi: " + (d || xhr.status), true); $("run").disabled = false; return;
+    }
+    const id = JSON.parse(xhr.responseText).job_id;
+    location.hash = "job=" + id;          // F5 hoặc gửi link cho đồng đội vẫn xem lại được
+    poll(id);
+  };
+  xhr.onerror = () => { setMsg("Lỗi mạng khi upload", true); $("run").disabled = false; };
+  xhr.send(fd);
+};
+
+async function poll(id) {
+  try {
+    const r = await fetch(`/api/jobs/${id}`);
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || r.status);
+    $("fill").style.width = (j.progress || 0) + "%";
+    if (j.status === "queued") setMsg(`Đang xếp hàng (còn ${j.ahead ?? 0} job phía trước)`);
+    else if (j.status === "running") setMsg(`${j.message} (${j.progress || 0}%)`);
+    else setMsg(j.message);
+
+    if (j.status === "done") return show(j);
+    if (j.status === "error") {
+      setMsg(`Lỗi: ${j.message}\n${j.log_tail || ""}`, true);
+      $("run").disabled = false; return;
+    }
+    setTimeout(() => poll(id), 1500);
+  } catch (e) {
+    setMsg(e.message, true); $("run").disabled = false;
+  }
+}
+
+/* ------------------------------------------------------------------ hiển thị kết quả */
+function render(box, url, keepTime) {
+  box.replaceChildren();
+  if (!url) { box.textContent = "(không có – pipeline chưa ghi file này)"; return; }
+  const isImg = /\.jpg$/i.test(url);
+  const n = document.createElement(isImg ? "img" : "video");
+  n.src = url;
+  if (!isImg) {
+    n.controls = true; n.preload = "auto";
+    ["play", "seeking"].forEach(ev => n.addEventListener(ev, () => { lastVideo = n; }));
+    if (keepTime) n.addEventListener("loadedmetadata", () => { n.currentTime = keepTime; }, { once: true });
+  }
+  box.appendChild(n);
+}
+
+function showHeat(k) {
+  const old = $("m2").querySelector("video");
+  const keep = old ? old.currentTime : 0;
+  render($("m2"), hm[k], keep);
+  $("m2").className = k === "white" ? "white" : "";
+  document.querySelectorAll("#heatTabs .tab").forEach(b => b.classList.toggle("on", b.dataset.k === k));
+}
+document.querySelectorAll("#heatTabs .tab").forEach(b => b.onclick = () => showHeat(b.dataset.k));
+
+async function show(j) {
+  files = j.files || {};
+  $("run").disabled = false;
+  $("status").classList.add("hidden");
+  $("result").classList.remove("hidden");
+  lastVideo = null; lastIdx = -1; syncing = false; $("sync").textContent = "Phát đồng bộ các video";
+
+  render($("m1"), files.bbox_video || files.bbox_image);
+  render($("m3"), files.flow_video || files.flow_image);
+  hm = { white: files.heatmap_white_video || files.heatmap_white_image,
+         video: files.heatmap_video || files.heatmap_image };
+  $("heatTabs").classList.toggle("hidden", !(hm.white && hm.video));
+  showHeat(hm.white ? "white" : "video");
+
+  series = null;
+  if (files.stats) {
+    try { series = await (await fetch(files.stats)).json(); } catch {}
+  }
+  const isImage = !!(files.bbox_image || files.heatmap_image || files.heatmap_white_image);
+  if (!series || !series.count || !series.count.length) {
+    $("cnt").textContent = "–";
+    $("cstat").textContent = "(chưa có dữ liệu đếm – pipeline chưa ghi crowd_stats.json)";
+    $("chart").classList.add("hidden");
+  } else {
+    $("chart").classList.remove("hidden");
+    series.max = Math.max(1, ...series.count.slice(0, 200000));
+    const s = series.summary || {};
+    $("cstat").textContent = isImage
+      ? "Ảnh tĩnh: số người đếm được trong 1 khung hình."
+      : `Cao nhất ${s.max_count} người (lúc ${mmss(s.max_count_t || 0)}) · trung bình ${s.mean_count} người. ` +
+        `Đây là số track hiển thị sau khi lọc của pipeline.`;
+    setCount(isImage ? series.count.length - 1 : 0);
+  }
+
+  if (files.log) {
+    $("dl").href = files.log;
+    let t = await (await fetch(files.log)).text();
+    try { t = JSON.stringify(JSON.parse(t), null, 2); } catch {}
+    $("log").textContent = t.split("\n").slice(0, 400).join("\n");
+  } else {
+    $("log").textContent = "(không có file log)";
+  }
+}
+
+/* ------------------------------------------------------------------ số người theo thời gian phát */
+function setCount(idx) {
+  $("cnt").textContent = series.count[idx];
+  $("mov").textContent = series.moving ? series.moving[idx] : "–";
+  $("spd").textContent = series.speed ? Math.round(series.speed[idx]) : "–";
+  const d = series.dir && series.dir[idx];
+  $("dir").textContent = d ? DIR_VI[d] : "–";
+  drawChart(idx);
+}
+
+function drawChart(idx) {
+  const c = $("chart"), dpr = window.devicePixelRatio || 1;
+  const W = c.clientWidth, H = 110;
+  if (!W) return;
+  if (c.width !== Math.round(W * dpr)) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
+  const g = c.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const css = getComputedStyle(document.documentElement);
+  const accent = css.getPropertyValue("--accent").trim(), muted = css.getPropertyValue("--muted").trim();
+  const n = series.count.length;
+  const X = i => n > 1 ? 4 + i / (n - 1) * (W - 8) : W / 2;
+  const Y = v => H - 16 - v / series.max * (H - 30);
+  g.strokeStyle = muted; g.globalAlpha = .4; g.beginPath(); g.moveTo(0, H - 16); g.lineTo(W, H - 16); g.stroke(); g.globalAlpha = 1;
+  g.strokeStyle = accent; g.lineWidth = 1.5; g.beginPath();
+  series.count.forEach((v, i) => i ? g.lineTo(X(i), Y(v)) : g.moveTo(X(i), Y(v)));
+  g.stroke();
+  g.fillStyle = muted; g.font = "11px system-ui";
+  g.fillText("0", 4, H - 3); g.fillText(`max ${series.max}`, 4, 11);
+  g.strokeStyle = "#dc2626"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(X(idx), 0); g.lineTo(X(idx), H - 16); g.stroke();
+  g.fillStyle = "#dc2626"; g.beginPath(); g.arc(X(idx), Y(series.count[idx]), 3.5, 0, 7); g.fill();
+}
+
+function tick() {
+  if (series && !$("result").classList.contains("hidden") && vids().length) {
+    const vs = vids();
+    const v = vs.find(x => !x.paused) || lastVideo || vs[0];
+    if (v && v.duration) {
+      const n = series.count.length;
+      const idx = Math.min(n - 1, Math.max(0, Math.floor(v.currentTime / v.duration * n)));
+      if (idx !== lastIdx) { lastIdx = idx; setCount(idx); }
+      if (syncing) vs.forEach(o => { if (o !== v && o.duration && Math.abs(o.currentTime - v.currentTime) > 0.25) o.currentTime = v.currentTime; });
+    }
+  }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+window.addEventListener("resize", () => { if (series && lastIdx >= 0) drawChart(lastIdx); });
+
+$("sync").onclick = () => {
+  const vs = vids(); if (!vs.length) return;
+  if (vs.some(v => !v.paused)) { vs.forEach(v => v.pause()); syncing = false; $("sync").textContent = "Phát đồng bộ các video"; return; }
+  const t = (lastVideo || vs[0]).currentTime;
+  vs.forEach(v => { v.muted = true; v.currentTime = t; v.play(); });
+  syncing = true; $("sync").textContent = "Dừng";
+};
+
+// mở lại job từ link dạng  http://host:8000/#job=abc123def456
+window.addEventListener("load", () => {
+  const m = location.hash.match(/job=([0-9a-f]{12})/);
+  if (m) { $("status").classList.remove("hidden"); $("run").disabled = true; poll(m[1]); }
+});
+</script>
+</body>
+</html>
