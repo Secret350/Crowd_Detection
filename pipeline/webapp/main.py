@@ -2,7 +2,8 @@
 Crowd Detection - web host
 Chạy:  uvicorn webapp.main:app --host 0.0.0.0 --port 8000
 (chạy từ thư mục gốc E:\\crowd_detection_project, trong venv .venv310)
-http://localhost:8000
+
+url: http://localhost:8000
 """
 import base64
 import json
@@ -35,7 +36,7 @@ MAX_VIDEO_MB = 500
 MAX_IMAGE_MB = 30
 # Đăng nhập HTTP Basic cho cả team. Đặt biến môi trường trước khi chạy; để trống = KHÔNG khoá.
 AUTH_USER = os.environ.get("CROWD_USER", "team")
-AUTH_PASS = os.environ.get("CROWD_PASS", "minhtri1311")
+AUTH_PASS = os.environ.get("CROWD_PASS", "")
 KEEP_HOURS = 24                            # tự xoá job cũ hơn số giờ này
 REENCODE = os.environ.get("CROWD_REENCODE", "0") == "1"   # pipeline đã ghi H.264, mặc định không mã hoá lại
 
