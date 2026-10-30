@@ -19,6 +19,7 @@ DEFAULTS = dict(
     heat_scale=4,                # lưới mật độ = frame / heat_scale
     heat_ema=0.3,                # alpha EMA theo thời gian
     heat_alpha=0.6,              # độ đậm overlay
+    heat_alpha_white=0.95,       # độ đậm heatmap khi vẽ trên nền trắng
     gather_sigma_frac=0.04,      # sigma cửa sổ lân cận, theo bề rộng frame
     gather_min_density=4.0,      # ngưỡng L để thành vùng nóng
     gather_min_area_frac=0.0005, # bỏ vùng quá nhỏ (theo diện tích lưới)
@@ -50,6 +51,7 @@ class CrowdAnalyzer:
         self._jet = cv2.applyColorMap(np.arange(256, dtype=np.uint8).reshape(256, 1),
                                       cv2.COLORMAP_JET).reshape(256, 3)   # bảng màu dựng 1 lần
         self.fi, self.t_prev = -1, None
+        self._feet = np.zeros((0, 2), np.float32)
 
     # ------------------------------------------------------------------ main
     def update(self, frame, tlwhs, ids, t_sec):
@@ -60,6 +62,7 @@ class CrowdAnalyzer:
 
         feet = np.array([[x + w / 2, y + h] for x, y, w, h in tlwhs], np.float32).reshape(-1, 2)
         ids = [int(i) for i in ids]
+        self._feet = feet
 
         # 1) bản đồ mật độ lân cận + EMA
         imp = np.zeros((self.hl, self.wl), np.float32)
@@ -167,17 +170,40 @@ class CrowdAnalyzer:
         if ev["confirmed"]:
             self.done.append(ev)
 
-    def _render(self, frame, t_sec):
+    def render_white(self, t_sec):
+        """Heatmap vẽ trên NỀN TRẮNG (không dùng ảnh video). Gọi ngay sau update() của cùng frame."""
+        return self._render(None, t_sec, white=True)
+
+    def _legend(self, out):
+        if self.h < 80 or self.w < 220:
+            return
+        bw, bh, x0, y0 = 150, 10, 10, self.h - 26
+        bar = self._jet[(np.linspace(0, 1, bw) * 255).astype(np.uint8)]
+        out[y0:y0 + bh, x0:x0 + bw] = bar[None, :, :]
+        cv2.rectangle(out, (x0, y0), (x0 + bw, y0 + bh), (80, 80, 80), 1)
+        tick = x0 + int(bw / 1.5)                                   # vị trí ngưỡng tụ tập (norm = 1/1.5)
+        cv2.line(out, (tick, y0 - 3), (tick, y0 + bh + 3), (40, 40, 40), 1)
+        cv2.putText(out, "density: low", (x0, y0 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (60, 60, 60), 1, cv2.LINE_AA)
+        cv2.putText(out, "gathering", (tick - 6, y0 + bh + 14), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (60, 60, 60), 1, cv2.LINE_AA)
+
+    def _render(self, frame, t_sec, white=False):
         thr = self.p["gather_min_density"]
         norm = np.clip(self.L_ema / (thr * 1.5), 0.0, 1.0)                # đỏ khi vượt ngưỡng tụ tập
         size = (self.w, self.h)
+        if white:
+            frame = np.full((self.h, self.w, 3), 255, np.uint8)
+        alpha = self.p["heat_alpha_white"] if white else self.p["heat_alpha"]
         # tô màu + tính alpha trên lưới thô rồi mới phóng to, blend bằng phép uint8 (nhanh hơn float toàn khung ~nhiều lần)
         color = cv2.resize(self._jet[(norm * 255).astype(np.uint8)], size, interpolation=cv2.INTER_LINEAR)
-        a8 = (np.clip(norm * 3, 0, 1) * self.p["heat_alpha"] * 255).astype(np.uint8)
+        a8 = (np.clip(norm * 3, 0, 1) * alpha * 255).astype(np.uint8)
         a8 = cv2.resize(a8, size, interpolation=cv2.INTER_LINEAR)
         a3 = cv2.merge([a8, a8, a8])
         out = cv2.add(cv2.multiply(frame, cv2.bitwise_not(a3), scale=1 / 255.0),
                       cv2.multiply(color, a3, scale=1 / 255.0))
+        ink = (40, 40, 40) if white else (255, 255, 255)
+        if white:
+            for fx, fy in self._feet:                                      # chấm nhỏ = vị trí chân từng người
+                cv2.circle(out, (int(fx), int(fy)), 3, (60, 60, 60), -1, cv2.LINE_AA)
         for ev in self.active:
             if ev["last_seen"] != t_sec:
                 continue
@@ -185,8 +211,11 @@ class CrowdAnalyzer:
             if ev["confirmed"]:
                 col, txt = (0, 0, 255), f"GATHERING n={len(ev['ids_now'])} dwell={ev['avg_now']:.0f}s"
             else:
-                col, txt = (0, 220, 255), f"candidate n={len(ev['ids_now'])} dwell={ev['avg_now']:.0f}s"
+                col = (0, 150, 230) if white else (0, 220, 255)
+                txt = f"candidate n={len(ev['ids_now'])} dwell={ev['avg_now']:.0f}s"
             cv2.rectangle(out, (x0, y0), (x1, y1), col, 2)
             cv2.putText(out, txt, (x0, max(y0 - 6, 14)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, col, 2)
-        cv2.putText(out, f"t={t_sec:.1f}s", (10, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        cv2.putText(out, f"t={t_sec:.1f}s", (10, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.7, ink, 2)
+        if white:
+            self._legend(out)
         return out

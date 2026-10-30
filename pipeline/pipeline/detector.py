@@ -27,6 +27,10 @@ def build_detector(cfg):
     use_cuda = cfg.device == "gpu" and torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
     exp = get_exp(cfg.exp_file, None)
+    if cfg.conf_thresh is not None:
+        exp.test_conf = cfg.conf_thresh
+    if cfg.test_size is not None:
+        exp.test_size = tuple(cfg.test_size)
     model = exp.get_model().to(device).eval()
     try:
         ckpt = torch.load(cfg.ckpt, map_location="cpu", weights_only=False)
@@ -38,4 +42,6 @@ def build_detector(cfg):
     fp16 = cfg.fp16 and use_cuda
     if fp16:
         model = model.half()
+    print(f"[detector] device={device} fp16={fp16} test_size={exp.test_size} "
+          f"test_conf={exp.test_conf} nms={exp.nmsthre}")
     return exp, Predictor(model, exp, device, fp16)

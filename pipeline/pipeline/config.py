@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional, Tuple
 
 ROOT = Path(__file__).resolve().parents[1]      # thư mục chứa pipeline/ và ByteTrack/
 BT_ROOT = ROOT / "ByteTrack"
@@ -13,6 +14,8 @@ class Config:
     device: str = "gpu"
     fp16: bool = True
     fuse: bool = True
+    conf_thresh: Optional[float] = None
+    test_size: Optional[Tuple[int, int]] = None
 
     # --- ByteTrack (BYTETracker đọc các thuộc tính này trực tiếp từ object cfg) ---
     mot20: bool = True

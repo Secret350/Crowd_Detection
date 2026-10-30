@@ -17,6 +17,7 @@ from yolox.utils.visualize import plot_tracking
 from .analyzer import CrowdAnalyzer
 from .config import Config
 from .detector import build_detector
+from .extras import CrowdExtras
 from .status import write_status
 from .video_io import close_writer, open_reader, open_writer
 
@@ -38,6 +39,7 @@ def process_video(input_path, out_dir, cfg=None, skip=1, on_progress=None):
     w_bbox = open_writer(out / "output_bbox.mp4", m["w"], m["h"], f"{eff_fps:.3f}")
     w_heat = (open_writer(out / "output_heatmap.mp4", m["w"], m["h"], f"{eff_fps:.3f}")
               if analyzer.enabled else None)
+    extras = CrowdExtras(analyzer, (m["w"], m["h"]), eff_fps, out, cfg)   # heatmap nền trắng + flow + đếm người
 
     cuda = torch is not None and torch.cuda.is_available()
     sync = torch.cuda.synchronize if cuda else (lambda: None)
@@ -81,6 +83,7 @@ def process_video(input_path, out_dir, cfg=None, skip=1, on_progress=None):
             w_bbox.stdin.write(np.ascontiguousarray(vis).tobytes())
             if w_heat is not None:
                 w_heat.stdin.write(np.ascontiguousarray(heat).tobytes())
+            extras.update(tlwhs, ids, t_sec)        # phải đứng sau analyzer.update() của CÙNG frame
             tm["write"] += time.perf_counter() - t4
 
             done += 1
@@ -94,6 +97,7 @@ def process_video(input_path, out_dir, cfg=None, skip=1, on_progress=None):
         close_writer(w_bbox)
         if w_heat is not None:
             close_writer(w_heat)
+        extras.finish()
 
     events = analyzer.finish()
     if analyzer.enabled:
@@ -125,8 +129,11 @@ def main():
     p.add_argument("--ckpt")
     p.add_argument("--device", choices=["gpu", "cpu"])
     p.add_argument("--skip", type=int, default=1, help="xử lý 1 trong mỗi N frame (vd 3 cho video 30 fps)")
+    p.add_argument("--conf", type=float, help="ngưỡng confidence của detector (ByteTrack chỉ cần >= 0.1)")
+    p.add_argument("--test-size", type=int, nargs=2, metavar=("H", "W"), help="vd 736 1312")
     a = p.parse_args()
-    over = {k: v for k, v in {"ckpt": a.ckpt, "device": a.device}.items() if v}
+    over = {k: v for k, v in {"ckpt": a.ckpt, "device": a.device, "conf_thresh": a.conf,
+                              "test_size": tuple(a.test_size) if a.test_size else None}.items() if v is not None}
     process_video(a.input, a.out, replace(Config(), **over), skip=a.skip)
 
 
