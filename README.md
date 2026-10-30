@@ -26,6 +26,7 @@ pipeline/
 ├─ ByteTrack/            # ByteTrack/YOLOX source code
 ├─ models/               # Model checkpoints (.pth, excluded from Git)
 ├─ pipeline/             # Main processing package
+│  ├─ __init__.py
 │  ├─ run.py             # Entry point: video input → detection → tracking → analysis → output
 │  ├─ detector.py        # YOLOX initialization, preprocessing, and postprocessing
 │  ├─ analyzer.py        # Density heatmaps and abnormal gathering detection
