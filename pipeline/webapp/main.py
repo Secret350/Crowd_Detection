@@ -41,7 +41,7 @@ REENCODE = os.environ.get("CROWD_REENCODE", "0") == "1"   # pipeline đã ghi H.
 
 
 def build_cmd(video: Path, out_dir: Path) -> list[str]:
-    """Lệnh chạy pipeline. ĐIỀU CHỈNH cho khớp CLI thật của pipeline/run_pipeline.py."""
+    """Lệnh chạy pipeline. ĐIỀU CHỈNH cho khớp CLI thật của pipeline/run.py."""
     return [
         sys.executable, "-m", "pipeline.run",
         "--input", str(video),

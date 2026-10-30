@@ -171,7 +171,7 @@ class CrowdAnalyzer:
             self.done.append(ev)
 
     def render_white(self, t_sec):
-        """Heatmap vẽ trên NỀN TRẮNG (không dùng ảnh video). Gọi ngay sau update() của cùng frame."""
+        """Heatmap vẽ trên NỀN TRẮNG. Gọi ngay sau update() của cùng frame."""
         return self._render(None, t_sec, white=True)
 
     def _legend(self, out):
@@ -193,7 +193,7 @@ class CrowdAnalyzer:
         if white:
             frame = np.full((self.h, self.w, 3), 255, np.uint8)
         alpha = self.p["heat_alpha_white"] if white else self.p["heat_alpha"]
-        # tô màu + tính alpha trên lưới thô rồi mới phóng to, blend bằng phép uint8 (nhanh hơn float toàn khung ~nhiều lần)
+        # tô màu + tính alpha trên lưới thô rồi mới phóng to, blend bằng phép uint8
         color = cv2.resize(self._jet[(norm * 255).astype(np.uint8)], size, interpolation=cv2.INTER_LINEAR)
         a8 = (np.clip(norm * 3, 0, 1) * alpha * 255).astype(np.uint8)
         a8 = cv2.resize(a8, size, interpolation=cv2.INTER_LINEAR)
