@@ -147,3 +147,6 @@ YOLOX_outputs
 *.json
 *.bkp
 >>>>>>> Stashed changes
+pipeline/webapp/storage/
+*.pyc
+.venv/
