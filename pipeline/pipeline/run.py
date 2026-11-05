@@ -116,6 +116,8 @@ def process_video(input_path, out_dir, cfg=None, skip=1, on_progress=None):
         "vram_peak_mb": round(torch.cuda.max_memory_allocated() / 2 ** 20) if cuda else None,
         "stage_ms_per_frame": {k: round(v / max(done, 1) * 1000, 1) for k, v in tm.items()},
         "gathering_events": len(events),
+        "detect_breakdown_ms": {k: round(v / max(done, 1) * 1000, 1)
+                        for k, v in getattr(detect, "t", {}).items()},
     }
     (out / "meta.json").write_text(json.dumps(meta))
     print(json.dumps(meta))

@@ -32,7 +32,7 @@ UPLOADS = WEB_DIR / "storage" / "uploads"
 OUTPUTS = WEB_DIR / "storage" / "outputs"
 VIDEO_EXT = {".mp4", ".avi", ".mov", ".mkv"}
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
-MAX_VIDEO_MB = 500
+MAX_VIDEO_MB = 100
 MAX_IMAGE_MB = 30
 # Đăng nhập HTTP Basic cho cả team. Đặt biến môi trường trước khi chạy; để trống = KHÔNG khoá.
 AUTH_USER = os.environ.get("CROWD_USER", "team")
@@ -48,7 +48,9 @@ def build_cmd(video: Path, out_dir: Path) -> list[str]:
         "--input", str(video),
         "--out", str(out_dir),
         "--device", os.environ.get("CROWD_DEVICE", "gpu"),
+        "--conf", "0.1",
         "--skip", os.environ.get("CROWD_SKIP", "1"),
+        "--test-size","704","1280"
     ]
 
 
@@ -83,7 +85,7 @@ async def basic_auth(request: Request, call_next):
         except Exception:  # noqa: BLE001
             ok = False
     if not ok:
-        return Response("Cần đăng nhập", status_code=401,
+        return Response("Request to login!", status_code=401,
                         headers={"WWW-Authenticate": 'Basic realm="Crowd Detection"'})
     return await call_next(request)
 

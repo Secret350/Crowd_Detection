@@ -18,13 +18,13 @@ class Exp(MyExp):
         self.train_ann = "train.json"
         self.val_ann = "test.json"   # change to train.json when running on training set
         self.input_size = (896, 1600)
-        self.test_size = (896, 1600)
+        self.test_size = (704, 1280)
         #self.test_size = (736, 1920)
         self.random_size = (20, 36)
         self.max_epoch = 80
         self.print_interval = 20
         self.eval_interval = 5
-        self.test_conf = 0.001
+        self.test_conf = 0.1
         self.nmsthre = 0.7
         self.no_aug_epochs = 10
         self.basic_lr_per_img = 0.001 / 64.0
