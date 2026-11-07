@@ -2,7 +2,16 @@
 
 Analyze camera footage and images to **count people, generate density heatmaps, track pedestrian flow, and detect abnormal gatherings**.
 
+**Descriptive image**
+
+- Website:
 ![Sys_img](project_img/sys_img.png)
+- Bounding Box:
+![Bbox_img](project_img/bbox.png)
+- Flow:
+![Flow_img](project_img/flow.png)
+- Heat Map:
+![Heat_map_img](project_img/heat_map.png)
 
 > - **Project origin:** This project was developed at **AIThings Lab** (Multimodel-AIThings) as part of the lab's Computer Vision work.
 > The official lab repository is [Multimodel-AIThings/Crowd-Detection](https://github.com/Multimodel-AIThings/Crowd-Detection).
