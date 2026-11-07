@@ -2,13 +2,13 @@
 
 Analyze camera footage and images to **count people, generate density heatmaps, track pedestrian flow, and detect abnormal gatherings**.
 
-The core system uses FoundationVision/ByteTrack (YOLOX-X, MOT20) repository combined with a crowd density analysis module. A web application allows team members to upload videos and view processing results.
+![Sys_img](project_img/sys_img.png)
 
-<!-- TODO: Add 2–3 screenshots from ACTUAL results to docs/, then uncomment:
-![Heatmap on white background](docs/heatmap_white.png)
-![Pedestrian flow](docs/flow.png)
-![Web application](docs/web.png)
--->
+> - **Project origin:** This project was developed at **AIThings Lab** (Multimodel-AIThings) as part of the lab's Computer Vision work.
+> The official lab repository is [Multimodel-AIThings/Crowd-Detection](https://github.com/Multimodel-AIThings/Crowd-Detection).
+> This repository is a personal showcase copy of the author's branch (`minh_tri`), published with the lab's permission.
+> - The core system uses FoundationVision/ByteTrack (YOLOX-X, MOT20) repository combined with a crowd density analysis module. A web application allows team members to upload videos and view processing results.
+
 
 ## Features
 
@@ -223,6 +223,15 @@ To improve processing speed:
 - **Processing concurrency:** The web application uses a single worker to process jobs sequentially.
 - **Job persistence:** Job status is stored on disk and survives application restarts. However, jobs interrupted during execution are marked as failed.
 
+## Authors and Contributions
+
+Developed at **AIThings Lab** (Multimodel-AIThings). 
+
+- **Author and main developer:** Nguyễn Đức Minh Trí ([@Secret350](https://github.com/Secret350))
+- **AIThings Supervisor:** Dr. Nguyễn Nam Phong, Nguyễn Tiến Hồng, Trần Trung Dũng
+
+The ByteTrack/YOLOX components in `pipeline/ByteTrack/` are third-party code (see below) and were not written by the author.
+
 ## Acknowledgments
 
 This project builds upon the following open-source frameworks and research:
@@ -236,7 +245,8 @@ This project builds upon the following open-source frameworks and research:
 - This project incorporates components from [ByteTrack](https://github.com/FoundationVision/ByteTrack), developed by Yifu Zhang and contributors.
 - ByteTrack is distributed under the **MIT License**. The original copyright notices and license terms are included in `pipeline/ByteTrack/LICENSE`.
 - The crowd density estimation, abnormal gathering detection, pedestrian flow analysis, and web application are developed as part of this project.
-- The original components of Crowd Detection have not yet been assigned an open-source license. All third-party components remain subject to their respective licenses.
+- The original components of Crowd Detection (everything outside `pipeline/ByteTrack/`) were written by Nguyễn Đức Minh Trí at AIThings Lab. They have not yet been assigned an open-source license, so all rights are reserved by the author and AIThings Lab until a license is added. Please contact the lab before reusing this code.
+- All third-party components remain subject to their respective licenses.
 
 ### Academic Citation
 
